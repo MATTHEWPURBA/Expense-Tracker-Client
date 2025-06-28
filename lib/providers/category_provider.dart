@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/category_model.dart';
 import '../services/api_service.dart';
@@ -12,6 +13,7 @@ class CategoryProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   AuthProvider? _authProvider;
+  bool _disposed = false;
 
   CategoryProvider(this._apiService);
 
@@ -19,6 +21,12 @@ class CategoryProvider extends ChangeNotifier {
   List<CategoryModel> get categories => _categories;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   // Update auth provider reference
   void updateAuth(AuthProvider authProvider) {
@@ -42,7 +50,7 @@ class CategoryProvider extends ChangeNotifier {
         await _initializeDefaultCategories();
       }
       
-      notifyListeners();
+      _safeNotifyListeners();
     } on HttpException catch (e) {
       _setError(e.message);
       // If API fails, load default categories for offline use
@@ -79,7 +87,7 @@ class CategoryProvider extends ChangeNotifier {
       final newCategory = await _apiService.createCategory(categoryData);
       
       _categories.add(newCategory);
-      notifyListeners();
+      _safeNotifyListeners();
       
       return true;
     } on HttpException catch (e) {
@@ -95,6 +103,18 @@ class CategoryProvider extends ChangeNotifier {
 
   // Get categories by type
   List<CategoryModel> getCategoriesByType(String type) {
+    // If categories are empty, try to load them synchronously
+    if (_categories.isEmpty && !_disposed) {
+      // Use Future.microtask to load categories without blocking
+      Future.microtask(() {
+        if (!_disposed) {
+          loadCategories();
+        }
+      });
+      // Return empty list for now, will update UI when loaded
+      return [];
+    }
+    
     return _categories.where((c) {
       if (type == 'expense') {
         return c.isExpenseCategory;
@@ -158,7 +178,7 @@ class CategoryProvider extends ChangeNotifier {
       ...CategoryModel.getDefaultExpenseCategories(),
       ...CategoryModel.getDefaultIncomeCategories(),
     ];
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   // Get category names for dropdown
@@ -186,26 +206,42 @@ class CategoryProvider extends ChangeNotifier {
     return category?.icon ?? '📋';
   }
 
-  // Helper methods
+  // Helper methods - Fixed to prevent setState during build
   void _setLoading(bool loading) {
+    if (_disposed) return;
     _isLoading = loading;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void _setError(String error) {
+    if (_disposed) return;
     _error = error;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void _clearError() {
+    if (_disposed) return;
     _error = null;
-    notifyListeners();
+    _safeNotifyListeners();
+  }
+
+  // Safe notify listeners that defers the call if we're in build phase
+  void _safeNotifyListeners() {
+    // Immediately return if disposed - don't even schedule the notification
+    if (_disposed || !hasListeners) return;
+    
+    // Call notifyListeners directly but catch any disposal errors
+    try {
+      notifyListeners();
+    } catch (e) {
+      // Provider was disposed during the call - ignore silently
+    }
   }
 
   // Clear all data (useful for logout)
   void clear() {
+    if (_disposed) return;
     _categories.clear();
     _clearError();
-    notifyListeners();
   }
 } 

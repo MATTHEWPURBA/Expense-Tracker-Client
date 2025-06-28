@@ -32,8 +32,13 @@ class ApiService {
   // Generic error handling
   void _handleError(http.Response response) {
     if (response.statusCode >= 400) {
-      final Map<String, dynamic> errorData = json.decode(response.body);
-      throw HttpException('${response.statusCode}: ${errorData['message'] ?? errorData['error'] ?? 'Unknown error'}');
+      try {
+        final Map<String, dynamic> errorData = json.decode(response.body);
+        throw HttpException('${response.statusCode}: ${errorData['message'] ?? errorData['error'] ?? errorData.toString()}');
+      } catch (e) {
+        // If response body is not valid JSON
+        throw HttpException('${response.statusCode}: ${response.body}');
+      }
     }
   }
 
@@ -159,7 +164,7 @@ class ApiService {
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
 
-    final uri = Uri.parse('$baseUrl/api/transactions/').replace(
+    final uri = Uri.parse('$baseUrl/api/transactions/list/').replace(
       queryParameters: queryParams,
     );
 

@@ -8,6 +8,7 @@ import '../../routes/app_routes.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
+import '../profile/profile_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,17 +23,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // Use a longer delay to be absolutely sure we're out of the build phase
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
 
   Future<void> _loadData() async {
-    final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
-    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    if (!mounted) return;
     
-    await Future.wait([
-      transactionProvider.loadTransactions(refresh: true),
-      categoryProvider.loadCategories(refresh: true),
-    ]);
+    try {
+      final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+      final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      
+      // Load categories first, then transactions
+      await categoryProvider.loadCategories(refresh: true);
+      
+      // Add a small delay between operations
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      if (mounted) {
+        await transactionProvider.loadTransactions(refresh: true);
+      }
+    } catch (e) {
+      // Silently handle any errors during initial load
+      print('Dashboard load error: $e');
+    }
   }
 
   @override
@@ -78,8 +96,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       floatingActionButton: _selectedIndex == 0 || _selectedIndex == 1
           ? FloatingActionButton(
-              onPressed: () {
-                AppRoutes.navigateToAddTransaction(context);
+              onPressed: () async {
+                final result = await AppRoutes.navigateToAddTransaction(context);
+                if (result == true && mounted) {
+                  // Refresh transaction data after successful creation
+                  try {
+                    final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                    await Future.delayed(const Duration(milliseconds: 100));
+                    if (mounted) {
+                      transactionProvider.loadTransactions();
+                    }
+                  } catch (e) {
+                    // Provider might be disposed, ignore error
+                  }
+                }
               },
               backgroundColor: AppTheme.primaryColor,
               child: const Icon(Icons.add, color: Colors.white),
@@ -237,7 +267,20 @@ class _DashboardTab extends StatelessWidget {
                     'Add Income',
                     Icons.add_circle,
                     AppTheme.successColor,
-                    () => AppRoutes.navigateToAddTransaction(context, type: 'income'),
+                    () async {
+                      final result = await AppRoutes.navigateToAddTransaction(context, type: 'income');
+                      if (result == true && context.mounted) {
+                        try {
+                          final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                          await Future.delayed(const Duration(milliseconds: 100));
+                          if (context.mounted) {
+                            transactionProvider.loadTransactions();
+                          }
+                        } catch (e) {
+                          // Provider might be disposed, ignore error
+                        }
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -247,7 +290,20 @@ class _DashboardTab extends StatelessWidget {
                     'Add Expense',
                     Icons.remove_circle,
                     AppTheme.errorColor,
-                    () => AppRoutes.navigateToAddTransaction(context, type: 'expense'),
+                    () async {
+                      final result = await AppRoutes.navigateToAddTransaction(context, type: 'expense');
+                      if (result == true && context.mounted) {
+                        try {
+                          final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                          await Future.delayed(const Duration(milliseconds: 100));
+                          if (context.mounted) {
+                            transactionProvider.loadTransactions();
+                          }
+                        } catch (e) {
+                          // Provider might be disposed, ignore error
+                        }
+                      }
+                    },
                   ),
                 ),
               ],
@@ -460,8 +516,166 @@ class _ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Profile Tab - Coming Soon'),
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.user;
+        
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppConstants.defaultPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 20),
+                
+                // User avatar and info
+                Center(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                        backgroundImage: user?.profile?.avatar != null
+                            ? NetworkImage(user!.profile!.avatar!)
+                            : null,
+                        child: user?.profile?.avatar == null
+                            ? Text(
+                                user?.firstName?.isNotEmpty == true
+                                    ? user!.firstName![0].toUpperCase()
+                                    : user?.username?.isNotEmpty == true
+                                        ? user!.username![0].toUpperCase()
+                                        : 'U',
+                                style: const TextStyle(
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              )
+                            : null,
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      Text(
+                        user?.firstName?.isNotEmpty == true && user?.lastName?.isNotEmpty == true
+                            ? '${user!.firstName} ${user!.lastName}'
+                            : user?.username ?? 'User',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      
+                      if (user?.email?.isNotEmpty == true)
+                        Text(
+                          user!.email!,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // Profile options
+                Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.edit),
+                        title: const Text('Edit Profile'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () => AppRoutes.navigateToEditProfile(context),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.currency_exchange),
+                        title: const Text('Currency'),
+                        subtitle: Text(user?.profile?.currency ?? 'USD'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          // Navigate to currency settings
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.account_balance_wallet),
+                        title: const Text('Monthly Budget'),
+                        subtitle: Text(user?.profile?.monthlyBudget != null 
+                            ? '${authProvider.currencySymbol}${user!.profile!.monthlyBudget}'
+                            : 'Not set'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          // Navigate to budget settings
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Settings options
+                Card(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.notifications),
+                        title: const Text('Notifications'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          // Navigate to notification settings
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.security),
+                        title: const Text('Security'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          // Navigate to security settings
+                        },
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.help),
+                        title: const Text('Help & Support'),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: () {
+                          // Navigate to help
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 30),
+                
+                // Logout button
+                CustomButton(
+                  text: 'Logout',
+                  icon: Icons.logout,
+                  backgroundColor: AppTheme.errorColor,
+                  onPressed: () => AppRoutes.navigateToLogout(context),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // App version
+                Text(
+                  '${AppConstants.appName} v${AppConstants.appVersion}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[500],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 } 

@@ -25,13 +25,27 @@ class ExpenseTrackerApp extends StatelessWidget {
         ),
         ChangeNotifierProxyProvider<AuthProvider, TransactionProvider>(
           create: (context) => TransactionProvider(ApiService()),
-          update: (context, auth, previous) => 
-              TransactionProvider(ApiService())..updateAuth(auth),
+          update: (context, auth, previous) {
+            // Reuse the previous provider instance if it exists
+            if (previous != null) {
+              previous.updateAuth(auth);
+              return previous;
+            }
+            // Create new instance only if previous doesn't exist
+            return TransactionProvider(ApiService())..updateAuth(auth);
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, CategoryProvider>(
           create: (context) => CategoryProvider(ApiService()),
-          update: (context, auth, previous) => 
-              CategoryProvider(ApiService())..updateAuth(auth),
+          update: (context, auth, previous) {
+            // Reuse the previous provider instance if it exists
+            if (previous != null) {
+              previous.updateAuth(auth);
+              return previous;
+            }
+            // Create new instance only if previous doesn't exist
+            return CategoryProvider(ApiService())..updateAuth(auth);
+          },
         ),
       ],
       child: MaterialApp(

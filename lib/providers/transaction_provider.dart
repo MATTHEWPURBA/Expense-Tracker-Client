@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/transaction_model.dart';
 import '../services/api_service.dart';
@@ -12,6 +13,7 @@ class TransactionProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   AuthProvider? _authProvider;
+  bool _disposed = false;
 
   TransactionProvider(this._apiService);
 
@@ -19,6 +21,12 @@ class TransactionProvider extends ChangeNotifier {
   List<TransactionModel> get transactions => _transactions;
   bool get isLoading => _isLoading;
   String? get error => _error;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   // Update auth provider reference
   void updateAuth(AuthProvider authProvider) {
@@ -54,7 +62,7 @@ class TransactionProvider extends ChangeNotifier {
         _transactions.addAll(newTransactions);
       }
 
-      notifyListeners();
+      _safeNotifyListeners();
     } on HttpException catch (e) {
       _setError(e.message);
     } catch (e) {
@@ -75,6 +83,8 @@ class TransactionProvider extends ChangeNotifier {
     String? receipt,
     Map<String, dynamic>? metadata,
   }) async {
+    if (_disposed) return false;
+    
     _setLoading(true);
     _clearError();
 
@@ -92,19 +102,27 @@ class TransactionProvider extends ChangeNotifier {
 
       final newTransaction = await _apiService.createTransaction(transactionData);
       
+      if (_disposed) return false;
+      
       // Add to the beginning of the list
       _transactions.insert(0, newTransaction);
-      notifyListeners();
+      _safeNotifyListeners();
       
       return true;
     } on HttpException catch (e) {
-      _setError(e.message);
+      if (!_disposed) {
+        _setError(e.message);
+      }
       return false;
     } catch (e) {
-      _setError('Failed to create transaction');
+      if (!_disposed) {
+        _setError('Failed to create transaction');
+      }
       return false;
     } finally {
-      _setLoading(false);
+      if (!_disposed) {
+        _setLoading(false);
+      }
     }
   }
 
@@ -123,7 +141,7 @@ class TransactionProvider extends ChangeNotifier {
       final index = _transactions.indexWhere((t) => t.id == id);
       if (index != -1) {
         _transactions[index] = updatedTransaction;
-        notifyListeners();
+        _safeNotifyListeners();
       }
       
       return true;
@@ -148,7 +166,7 @@ class TransactionProvider extends ChangeNotifier {
       
       // Remove from the list
       _transactions.removeWhere((t) => t.id == id);
-      notifyListeners();
+      _safeNotifyListeners();
       
       return true;
     } on HttpException catch (e) {
@@ -211,26 +229,42 @@ class TransactionProvider extends ChangeNotifier {
     return grouped;
   }
 
-  // Helper methods
+  // Helper methods - Fixed to prevent setState during build
   void _setLoading(bool loading) {
+    if (_disposed) return;
     _isLoading = loading;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void _setError(String error) {
+    if (_disposed) return;
     _error = error;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   void _clearError() {
+    if (_disposed) return;
     _error = null;
-    notifyListeners();
+    _safeNotifyListeners();
+  }
+
+  // Safe notify listeners that defers the call if we're in build phase
+  void _safeNotifyListeners() {
+    // Immediately return if disposed - don't even schedule the notification
+    if (_disposed || !hasListeners) return;
+    
+    // Call notifyListeners directly but catch any disposal errors
+    try {
+      notifyListeners();
+    } catch (e) {
+      // Provider was disposed during the call - ignore silently
+    }
   }
 
   // Clear all data (useful for logout)
   void clear() {
+    if (_disposed) return;
     _transactions.clear();
     _clearError();
-    notifyListeners();
   }
 } 

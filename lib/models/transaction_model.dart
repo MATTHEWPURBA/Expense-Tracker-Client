@@ -2,11 +2,31 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'transaction_model.g.dart';
 
+// Custom converter to handle amount as either string or number
+class AmountConverter implements JsonConverter<double, dynamic> {
+  const AmountConverter();
+
+  @override
+  double fromJson(dynamic json) {
+    if (json is String) {
+      return double.parse(json);
+    }
+    if (json is num) {
+      return json.toDouble();
+    }
+    throw ArgumentError('Amount must be a string or number');
+  }
+
+  @override
+  dynamic toJson(double object) => object;
+}
+
 @JsonSerializable()
 class TransactionModel {
   final int? id;
   final String title;
   final String description;
+  @AmountConverter()
   final double amount;
   final String type; // 'expense' or 'income'
   final String category;

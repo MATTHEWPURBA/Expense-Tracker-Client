@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/auth/logout_screen.dart';
 import '../screens/home/dashboard_screen.dart';
 import '../screens/transactions/transaction_list_screen.dart';
 import '../screens/transactions/add_transaction_screen.dart';
@@ -17,6 +18,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String register = '/register';
+  static const String logout = '/logout';
   static const String dashboard = '/dashboard';
   static const String transactions = '/transactions';
   static const String addTransaction = '/add-transaction';
@@ -36,6 +38,9 @@ class AppRoutes {
       
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
+      
+      case logout:
+        return MaterialPageRoute(builder: (_) => const LogoutScreen());
       
       case dashboard:
         return MaterialPageRoute(builder: (_) => const DashboardScreen());
@@ -85,12 +90,24 @@ class AppRoutes {
     Navigator.pushNamedAndRemoveUntil(context, login, (route) => false);
   }
 
+  static void navigateToLogout(BuildContext context) {
+    Navigator.pushNamed(context, logout);
+  }
+
   static void navigateToDashboard(BuildContext context) {
     Navigator.pushNamedAndRemoveUntil(context, dashboard, (route) => false);
   }
 
-  static void navigateToAddTransaction(BuildContext context, {String? type}) {
-    Navigator.pushNamed(context, addTransaction, arguments: {'type': type});
+  static Future<bool?> navigateToAddTransaction(BuildContext context, {String? type}) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(
+          initialType: type,
+        ),
+      ),
+    );
+    return result;
   }
 
   static void navigateToEditTransaction(BuildContext context, TransactionModel transaction) {

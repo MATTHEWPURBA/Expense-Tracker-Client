@@ -44,10 +44,24 @@ class CustomTextField extends StatelessWidget {
       readOnly: readOnly,
       maxLines: maxLines,
       maxLength: maxLength,
+      style: const TextStyle(
+        color: Colors.black87, // Explicit dark text color
+        fontSize: 16,
+        fontWeight: FontWeight.normal,
+      ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText ?? label,
-        prefixIcon: prefixIcon != null ? Icon(prefixIcon) : null,
+        labelStyle: TextStyle(
+          color: Colors.grey[600], // Dark gray for label
+        ),
+        hintStyle: TextStyle(
+          color: Colors.grey[500], // Light gray for hint
+        ),
+        prefixIcon: prefixIcon != null ? Icon(
+          prefixIcon,
+          color: Colors.grey[600], // Dark gray for prefix icon
+        ) : null,
         suffixIcon: suffixIcon,
         counterText: '', // Hide character counter
       ),
