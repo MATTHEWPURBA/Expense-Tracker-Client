@@ -1,0 +1,72 @@
+name: expense_tracker_client
+description: A Flutter frontend for the Expense Tracker application
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # HTTP client
+  http: ^1.1.0
+  dio: ^5.3.2
+  
+  # State management
+  provider: ^6.1.1
+  
+  # Local storage
+  shared_preferences: ^2.2.2
+  
+  # JWT token handling
+  jwt_decode: ^0.3.1
+  
+  # JSON serialization
+  json_annotation: ^4.8.1
+  
+  # UI components
+  cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
+  flutter_svg: ^2.0.9
+  
+  # Forms and validation
+  flutter_form_builder: ^10.0.1
+  form_builder_validators: ^11.2.0
+  
+  # Charts for analytics
+  fl_chart: ^1.0.0
+  
+  # Date picker
+  intl: ^0.20.2
+  
+  # Image picker
+  image_picker: ^1.0.4
+  
+  # Loading indicators
+  flutter_spinkit: ^5.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # Code generation
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/icons/
+  
+  # fonts:
+    # - family: CustomIcons
+    #   fonts:
+    #     - asset: assets/fonts/CustomIcons.ttf 
