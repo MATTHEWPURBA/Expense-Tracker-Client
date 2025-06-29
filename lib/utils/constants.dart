@@ -1,6 +1,6 @@
 class AppConstants {
   // API Configuration
-  static const String baseUrl = 'http://localhost:8000'; // Change this for production
+  static const String baseUrl = 'http://127.0.0.1:8000'; // Change this for production
   
   // Shared Preferences Keys
   static const String accessTokenKey = 'access_token';

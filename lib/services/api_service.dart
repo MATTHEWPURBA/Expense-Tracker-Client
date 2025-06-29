@@ -29,6 +29,17 @@ class ApiService {
     return headers;
   }
 
+  // Generic GET method
+  Future<Map<String, dynamic>> get(String endpoint, {bool includeAuth = true}) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api$endpoint'),
+      headers: await _getHeaders(includeAuth: includeAuth),
+    );
+
+    _handleError(response);
+    return json.decode(response.body);
+  }
+
   // Generic error handling
   void _handleError(http.Response response) {
     if (response.statusCode >= 400) {

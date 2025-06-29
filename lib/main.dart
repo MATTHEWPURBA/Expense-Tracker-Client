@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/category_provider.dart';
+import 'providers/currency_provider.dart';
 import 'routes/app_routes.dart';
 import 'services/api_service.dart';
 import 'utils/theme.dart';
@@ -22,6 +23,9 @@ class ExpenseTrackerApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (context) => AuthProvider(ApiService()),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => CurrencyProvider(),
         ),
         ChangeNotifierProxyProvider<AuthProvider, TransactionProvider>(
           create: (context) => TransactionProvider(ApiService()),

@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
+import 'currency_provider.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService;
@@ -182,6 +183,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Update user currency
+  Future<bool> updateCurrency(String currencyCode) async {
+    print('🔄 DEBUG: updateCurrency called with: $currencyCode');
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Create profile data with only the currency update
+      final profileData = {
+        'currency': currencyCode,
+      };
+      
+      print('🔄 DEBUG: Sending profile data: $profileData');
+      _user = await _apiService.updateProfile(profileData);
+      print('🔄 DEBUG: Profile update successful, new currency: ${_user?.profile?.currency}');
+      
+      // Update stored user data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userDataKey, json.encode(_user!.toJson()));
+      
+      notifyListeners();
+      return true;
+    } on HttpException catch (e) {
+      print('🔴 ERROR: HttpException during currency update: ${e.message}');
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      print('🔴 ERROR: General exception during currency update: $e');
+      _setError('Failed to update currency');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Change password
   Future<bool> changePassword({
     required String oldPassword,
@@ -247,14 +283,39 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Get current user's currency symbol
-  String get currencySymbol {
+  String getCurrencySymbol(CurrencyProvider? currencyProvider) {
     if (_user?.profile?.currency != null) {
-      final currency = AppConstants.currencies.firstWhere(
-        (c) => c['code'] == _user!.profile!.currency,
-        orElse: () => {'symbol': '\$'},
-      );
-      return currency['symbol']!;
+      final currencyCode = _user!.profile!.currency!;
+      
+      // Try to get symbol from CurrencyProvider first
+      if (currencyProvider != null) {
+        final symbol = currencyProvider.getCurrencySymbol(currencyCode);
+        if (symbol != '\$' || currencyCode == 'USD') { // Only use fallback if it's not the default
+          return symbol;
+        }
+      }
+      
+      // Fallback to hardcoded mappings if CurrencyProvider doesn't have it
+      switch (currencyCode) {
+        case 'USD': return '\$';
+        case 'EUR': return '€';
+        case 'GBP': return '£';
+        case 'JPY': return '¥';
+        case 'CAD': return 'C\$';
+        case 'AUD': return 'A\$';
+        case 'CHF': return 'CHF';
+        case 'CNY': return '¥';
+        case 'INR': return '₹';
+        case 'SGD': return 'S\$';
+        case 'RP': return 'RP'; // Add Indonesian Rupiah
+        default: return '\$';
+      }
     }
     return '\$';
+  }
+
+  // Backward compatibility getter - will be deprecated
+  String get currencySymbol {
+    return getCurrencySymbol(null);
   }
 } 

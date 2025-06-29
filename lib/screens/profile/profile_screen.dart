@@ -2,16 +2,375 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeCurrencies();
+  }
+
+  Future<void> _initializeCurrencies() async {
+    if (!mounted) return;
+    
+    try {
+      final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+      
+      // Initialize with fallback currencies immediately
+      currencyProvider.initializeWithFallback();
+      
+      // Then try to load from API
+      await currencyProvider.loadCurrencies(refresh: false);
+    } catch (e) {
+      print('💱 ERROR: Failed to initialize currencies: $e');
+    }
+  }
+
+  void _showCurrencyDialog(BuildContext context) async {
+    print('🔵 DEBUG: _showCurrencyDialog called!');
+    print('🔵 DEBUG: Context is valid: ${context.mounted}');
+    
+    try {
+      // Always refresh currency data from API before showing dialog
+      final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+      print('🔵 DEBUG: Refreshing currencies from API...');
+      await currencyProvider.loadCurrencies(refresh: true);
+      print('🔵 DEBUG: Currency refresh completed. Total currencies: ${currencyProvider.currencies.length}');
+      
+      if (context.mounted) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (BuildContext context) {
+            print('🔵 DEBUG: Modal bottom sheet builder called');
+            return _buildCurrencyBottomSheet(context);
+          },
+        );
+        print('🔵 DEBUG: showModalBottomSheet completed successfully');
+      }
+    } catch (e) {
+      print('🔴 ERROR: Failed to show currency dialog: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load currencies: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildCurrencyBottomSheet(BuildContext context) {
+    print('🔵 DEBUG: Building currency bottom sheet widget');
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Select Currency',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    print('🔵 DEBUG: Close button pressed');
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          
+          // Currency list
+          Expanded(
+            child: Consumer2<AuthProvider, CurrencyProvider>(
+              builder: (context, authProvider, currencyProvider, child) {
+                final currentCurrency = authProvider.user?.profile?.currency ?? 'USD';
+                print('🔵 DEBUG: Current currency: $currentCurrency');
+                
+                // Show loading indicator if currencies are loading
+                if (currencyProvider.isLoading && currencyProvider.currencies.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Loading currencies...'),
+                      ],
+                    ),
+                  );
+                }
+                
+                // Show error message if currencies failed to load
+                if (currencyProvider.currencies.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No currencies available',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        if (currencyProvider.error != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            currencyProvider.error!,
+                            style: TextStyle(color: Colors.orange[700], fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            currencyProvider.loadCurrencies(refresh: true);
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                return Column(
+                  children: [
+                    // Show error banner if there's an error (but currencies are available)
+                    if (currencyProvider.error != null) ...[
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber, color: Colors.orange[700], size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                currencyProvider.error!,
+                                style: TextStyle(
+                                  color: Colors.orange[700],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    
+                    // Currency list
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: currencyProvider.currencies.length,
+                        itemBuilder: (context, index) {
+                          final currency = currencyProvider.currencies[index];
+                          final isSelected = currency.code == currentCurrency;
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected ? AppTheme.primaryColor : Colors.grey[300]!,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: ListTile(
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.primaryColor : Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    currency.symbol,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected ? Colors.white : Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                currency.name,
+                                style: TextStyle(
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? AppTheme.primaryColor : null,
+                                ),
+                              ),
+                              subtitle: Text(currency.code),
+                              trailing: isSelected
+                                  ? Icon(
+                                      Icons.check_circle,
+                                      color: AppTheme.primaryColor,
+                                    )
+                                  : null,
+                              onTap: () async {
+                                print('🔵 DEBUG: Currency selected: ${currency.name} (${currency.code})');
+                                
+                                try {
+                                  await authProvider.updateCurrency(currency.code);
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Currency changed to ${currency.name}'),
+                                        backgroundColor: AppTheme.primaryColor,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('🔴 ERROR: Failed to update currency: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to update currency'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBudgetDialog(BuildContext context) {
+    print('🟢 DEBUG: _showBudgetDialog called!');
+    print('🟢 DEBUG: Context is valid: ${context.mounted}');
+    
+    final TextEditingController budgetController = TextEditingController();
+    
+    try {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          print('🟢 DEBUG: Budget dialog builder called');
+        return AlertDialog(
+          title: const Text('Set Monthly Budget'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter your monthly spending budget',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: budgetController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Monthly Budget',
+                  hintText: '0',
+                  prefixText: '\$ ',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+                           ElevatedButton(
+                 onPressed: () {
+                   print('🟢 DEBUG: Budget save button pressed');
+                   // TODO: Update user budget preference
+                   final budget = budgetController.text;
+                   print('🟢 DEBUG: Budget value: $budget');
+                   ScaffoldMessenger.of(context).showSnackBar(
+                     SnackBar(
+                       content: Text('Budget set to \$$budget'),
+                       backgroundColor: AppTheme.primaryColor,
+                     ),
+                   );
+                   Navigator.pop(context);
+                 },
+                 style: ElevatedButton.styleFrom(
+                   backgroundColor: AppTheme.primaryColor,
+                 ),
+                 child: const Text('Save'),
+               ),
+             ],
+           );
+         },
+       );
+       print('🟢 DEBUG: showDialog completed successfully');
+     } catch (e) {
+       print('🔴 ERROR: Failed to show budget dialog: $e');
+     }
+   }
+
+  @override
   Widget build(BuildContext context) {
+    print('📱 DEBUG: ProfileScreen build called');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
@@ -101,7 +460,10 @@ class ProfileScreen extends StatelessWidget {
                         subtitle: Text(user?.profile?.currency ?? 'USD'),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
-                          // Navigate to currency settings
+                          print('🟡 DEBUG: Currency ListTile tapped!');
+                          print('🟡 DEBUG: Current context mounted: ${context.mounted}');
+                          print('🟡 DEBUG: Calling _showCurrencyDialog...');
+                          _showCurrencyDialog(context);
                         },
                       ),
                       const Divider(height: 1),
@@ -113,7 +475,10 @@ class ProfileScreen extends StatelessWidget {
                             : 'Not set'),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
-                          // Navigate to budget settings
+                          print('🟢 DEBUG: Budget ListTile tapped!');
+                          print('🟢 DEBUG: Current context mounted: ${context.mounted}');
+                          print('🟢 DEBUG: Calling _showBudgetDialog...');
+                          _showBudgetDialog(context);
                         },
                       ),
                     ],
@@ -132,6 +497,9 @@ class ProfileScreen extends StatelessWidget {
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
                           // Navigate to notification settings
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Notifications - Coming Soon')),
+                          );
                         },
                       ),
                       const Divider(height: 1),
@@ -141,6 +509,9 @@ class ProfileScreen extends StatelessWidget {
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
                           // Navigate to security settings
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Security Settings - Coming Soon')),
+                          );
                         },
                       ),
                       const Divider(height: 1),
@@ -150,6 +521,9 @@ class ProfileScreen extends StatelessWidget {
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
                           // Navigate to help
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Help & Support - Coming Soon')),
+                          );
                         },
                       ),
                     ],
