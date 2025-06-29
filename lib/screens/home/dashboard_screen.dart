@@ -6,12 +6,14 @@ import '../../providers/auth_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../models/transaction_model.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
 import '../profile/profile_screen.dart';
+import '../notifications/notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -47,15 +49,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
       final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+      final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
       
-      // Load categories first, then transactions
+      // Load categories first, then transactions and notifications
       await categoryProvider.loadCategories(refresh: true);
       
       // Add a small delay between operations
       await Future.delayed(const Duration(milliseconds: 50));
       
       if (mounted) {
-        await transactionProvider.loadTransactions(refresh: true);
+        // Load data in parallel for better performance
+        await Future.wait([
+          transactionProvider.loadTransactions(refresh: true),
+          notificationProvider.loadStats(),
+        ]);
       }
     } catch (e) {
       // Silently handle any errors during initial load
@@ -148,9 +155,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Refresh transaction data after successful creation
                     try {
                       final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                      final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
                       await Future.delayed(const Duration(milliseconds: 100));
                       if (mounted) {
-                        transactionProvider.loadTransactions();
+                        // Load transactions and update notification stats
+                        await Future.wait([
+                          transactionProvider.loadTransactions(),
+                          notificationProvider.loadStats(),
+                        ]);
                       }
                     } catch (e) {
                       // Provider might be disposed, ignore error
@@ -194,9 +206,11 @@ class _DashboardTab extends StatelessWidget {
           onRefresh: () async {
             final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
             final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+            final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
             await Future.wait([
               categoryProvider.loadCategories(refresh: true),
               transactionProvider.loadTransactions(refresh: true),
+              notificationProvider.loadStats(),
             ]);
           },
           child: SingleChildScrollView(
@@ -207,10 +221,11 @@ class _DashboardTab extends StatelessWidget {
                 // Header Section
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                  child: Consumer<AuthProvider>(
-                    builder: (context, authProvider, child) {
+                  child: Consumer2<AuthProvider, NotificationProvider>(
+                    builder: (context, authProvider, notificationProvider, child) {
                       final user = authProvider.user;
                       final greeting = _getGreeting();
+                      final unreadCount = notificationProvider.unreadCount;
                       
                       return Row(
                         children: [
@@ -236,6 +251,85 @@ class _DashboardTab extends StatelessWidget {
                               ],
                             ),
                           ),
+                          
+                          // Notification Icon with Badge
+                          Container(
+                            margin: const EdgeInsets.only(right: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                hoverColor: AppTheme.primaryColor.withOpacity(0.1),
+                                splashColor: AppTheme.primaryColor.withOpacity(0.2),
+                                onTap: () {
+                                  // Navigate to notifications screen
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const NotificationsScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Stack(
+                                    children: [
+                                      Icon(
+                                        unreadCount > 0 
+                                            ? Icons.notifications
+                                            : Icons.notifications_outlined,
+                                        color: unreadCount > 0 
+                                            ? AppTheme.primaryColor
+                                            : Colors.grey[600],
+                                        size: 28,
+                                      ),
+                                      if (unreadCount > 0)
+                                        Positioned(
+                                          right: 0,
+                                          top: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red,
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 20,
+                                              minHeight: 20,
+                                            ),
+                                            child: Text(
+                                              unreadCount > 99 ? '99+' : unreadCount.toString(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          // Avatar
                           Container(
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
@@ -426,9 +520,13 @@ class _DashboardTab extends StatelessWidget {
                                 if (result == true && context.mounted) {
                                   try {
                                     final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                                    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
                                     await Future.delayed(const Duration(milliseconds: 100));
                                     if (context.mounted) {
-                                      transactionProvider.loadTransactions();
+                                      await Future.wait([
+                                        transactionProvider.loadTransactions(),
+                                        notificationProvider.loadStats(),
+                                      ]);
                                     }
                                   } catch (e) {
                                     // Provider might be disposed, ignore error
@@ -450,9 +548,13 @@ class _DashboardTab extends StatelessWidget {
                                 if (result == true && context.mounted) {
                                   try {
                                     final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+                                    final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
                                     await Future.delayed(const Duration(milliseconds: 100));
                                     if (context.mounted) {
-                                      transactionProvider.loadTransactions();
+                                      await Future.wait([
+                                        transactionProvider.loadTransactions(),
+                                        notificationProvider.loadStats(),
+                                      ]);
                                     }
                                   } catch (e) {
                                     // Provider might be disposed, ignore error

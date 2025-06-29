@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../models/transaction_model.dart';
 import '../models/category_model.dart';
+import '../models/notification_model.dart';
 import '../utils/constants.dart';
 
 class ApiService {
@@ -260,5 +261,184 @@ class ApiService {
     _handleError(response);
 
     return json.decode(response.body);
+  }
+
+  // Notification endpoints
+  Future<List<NotificationModel>> getNotifications({
+    int page = 1,
+    bool? isRead,
+    bool? isArchived,
+    String? type,
+    String? priority,
+    String? search,
+    String? startDate,
+    String? endDate,
+    bool includeExpired = false,
+    String ordering = '-created_at',
+  }) async {
+    Map<String, String> queryParams = {'page': page.toString()};
+    if (isRead != null) queryParams['is_read'] = isRead.toString();
+    if (isArchived != null) queryParams['is_archived'] = isArchived.toString();
+    if (type != null) queryParams['type'] = type;
+    if (priority != null) queryParams['priority'] = priority;
+    if (search != null) queryParams['search'] = search;
+    if (startDate != null) queryParams['start_date'] = startDate;
+    if (endDate != null) queryParams['end_date'] = endDate;
+    if (includeExpired) queryParams['include_expired'] = 'true';
+    queryParams['ordering'] = ordering;
+
+    final uri = Uri.parse('$baseUrl/api/notifications/list/').replace(
+      queryParameters: queryParams,
+    );
+
+    final response = await http.get(uri, headers: await _getHeaders());
+    _handleError(response);
+
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      final List<dynamic> notificationsList = data['data']['results'] ?? data['data'];
+      return notificationsList.map((json) => NotificationModel.fromJson(json)).toList();
+    }
+    throw HttpException('Failed to load notifications');
+  }
+
+  Future<NotificationModel> getNotification(int id) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications/$id/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    return NotificationModel.fromJson(json.decode(response.body));
+  }
+
+  Future<NotificationModel> updateNotification(int id, Map<String, dynamic> notificationData) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/api/notifications/$id/update/'),
+      headers: await _getHeaders(),
+      body: json.encode(notificationData),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return NotificationModel.fromJson(data['data']);
+    }
+    throw HttpException('Failed to update notification');
+  }
+
+  Future<void> deleteNotification(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/notifications/$id/delete/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+  }
+
+  Future<NotificationModel> markNotificationRead(int id) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/notifications/$id/mark-read/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return NotificationModel.fromJson(data['data']);
+    }
+    throw HttpException('Failed to mark notification as read');
+  }
+
+  Future<int> markAllNotificationsRead() async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/notifications/mark-all-read/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return data['data']['updated_count'];
+    }
+    throw HttpException('Failed to mark all notifications as read');
+  }
+
+  Future<int> bulkNotificationAction({
+    required List<int> notificationIds,
+    required String action,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/notifications/bulk-action/'),
+      headers: await _getHeaders(),
+      body: json.encode({
+        'notification_ids': notificationIds,
+        'action': action,
+      }),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return data['data']['updated_count'];
+    }
+    throw HttpException('Failed to perform bulk action');
+  }
+
+  Future<NotificationStats> getNotificationStats() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications/stats/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return NotificationStats.fromJson(data['data']);
+    }
+    throw HttpException('Failed to load notification stats');
+  }
+
+  Future<NotificationPreference> getNotificationPreferences() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications/preferences/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return NotificationPreference.fromJson(data['data']);
+    }
+    throw HttpException('Failed to load notification preferences');
+  }
+
+  Future<NotificationPreference> updateNotificationPreferences(Map<String, dynamic> preferences) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/notifications/preferences/'),
+      headers: await _getHeaders(),
+      body: json.encode(preferences),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return NotificationPreference.fromJson(data['data']);
+    }
+    throw HttpException('Failed to update notification preferences');
+  }
+
+  Future<Map<String, dynamic>> getNotificationTypes() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications/types/'),
+      headers: await _getHeaders(),
+    );
+
+    _handleError(response);
+    final data = json.decode(response.body);
+    if (data['success'] == true) {
+      return data['data'];
+    }
+    throw HttpException('Failed to load notification types');
   }
 } 

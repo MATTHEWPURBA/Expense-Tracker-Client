@@ -6,6 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/category_provider.dart';
 import 'providers/currency_provider.dart';
+import 'providers/notification_provider.dart';
 import 'routes/app_routes.dart';
 import 'services/api_service.dart';
 import 'utils/theme.dart';
@@ -49,6 +50,18 @@ class ExpenseTrackerApp extends StatelessWidget {
             }
             // Create new instance only if previous doesn't exist
             return CategoryProvider(ApiService())..updateAuth(auth);
+          },
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
+          create: (context) => NotificationProvider(),
+          update: (context, auth, previous) {
+            // Reuse the previous provider instance if it exists
+            if (previous != null) {
+              previous.updateAuth(auth);
+              return previous;
+            }
+            // Create new instance only if previous doesn't exist
+            return NotificationProvider()..updateAuth(auth);
           },
         ),
       ],

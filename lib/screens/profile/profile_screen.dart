@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/currency_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 import '../../widgets/custom_button.dart';
+import '../notifications/notifications_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -730,9 +732,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         title: const Text('Notifications'),
                         trailing: const Icon(Icons.arrow_forward_ios),
                         onTap: () {
-                          // Navigate to notification settings
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Notifications - Coming Soon')),
+                          // Navigate to notifications screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationsScreen(),
+                            ),
                           );
                         },
                       ),
