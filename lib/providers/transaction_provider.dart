@@ -253,12 +253,16 @@ class TransactionProvider extends ChangeNotifier {
     // Immediately return if disposed - don't even schedule the notification
     if (_disposed || !hasListeners) return;
     
-    // Call notifyListeners directly but catch any disposal errors
-    try {
-      notifyListeners();
-    } catch (e) {
-      // Provider was disposed during the call - ignore silently
-    }
+    // Use Future.microtask to avoid setState during build
+    Future.microtask(() {
+      if (!_disposed && hasListeners) {
+        try {
+          notifyListeners();
+        } catch (e) {
+          // Provider was disposed during the call - ignore silently
+        }
+      }
+    });
   }
 
   // Clear all data (useful for logout)

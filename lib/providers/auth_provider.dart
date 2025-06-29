@@ -218,6 +218,41 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Update user monthly budget
+  Future<bool> updateMonthlyBudget(double? monthlyBudget) async {
+    print('🔄 DEBUG: updateMonthlyBudget called with: $monthlyBudget');
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Create profile data with only the monthly budget update
+      final profileData = {
+        'monthly_budget': monthlyBudget,
+      };
+      
+      print('🔄 DEBUG: Sending profile data: $profileData');
+      _user = await _apiService.updateProfile(profileData);
+      print('🔄 DEBUG: Profile update successful, new monthly budget: ${_user?.profile?.monthlyBudget}');
+      
+      // Update stored user data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.userDataKey, json.encode(_user!.toJson()));
+      
+      notifyListeners();
+      return true;
+    } on HttpException catch (e) {
+      print('🔴 ERROR: HttpException during monthly budget update: ${e.message}');
+      _setError(e.message);
+      return false;
+    } catch (e) {
+      print('🔴 ERROR: General exception during monthly budget update: $e');
+      _setError('Failed to update monthly budget');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Change password
   Future<bool> changePassword({
     required String oldPassword,
@@ -289,9 +324,13 @@ class AuthProvider extends ChangeNotifier {
       
       // Try to get symbol from CurrencyProvider first
       if (currencyProvider != null) {
-        final symbol = currencyProvider.getCurrencySymbol(currencyCode);
-        if (symbol != '\$' || currencyCode == 'USD') { // Only use fallback if it's not the default
-          return symbol;
+        try {
+          final symbol = currencyProvider.getCurrencySymbol(currencyCode);
+          if (symbol.isNotEmpty && (symbol != '\$' || currencyCode == 'USD')) {
+            return symbol;
+          }
+        } catch (e) {
+          // Fall through to hardcoded mappings
         }
       }
       
@@ -307,7 +346,12 @@ class AuthProvider extends ChangeNotifier {
         case 'CNY': return '¥';
         case 'INR': return '₹';
         case 'SGD': return 'S\$';
-        case 'RP': return 'RP'; // Add Indonesian Rupiah
+        case 'IDR': return 'Rp'; // Indonesian Rupiah (standard code)
+        case 'RP': return 'RP'; // Indonesian Rupiah (your custom code)
+        case 'THB': return '฿'; // Thai Baht
+        case 'MYR': return 'RM'; // Malaysian Ringgit
+        case 'PHP': return '₱'; // Philippine Peso
+        case 'VND': return '₫'; // Vietnamese Dong
         default: return '\$';
       }
     }

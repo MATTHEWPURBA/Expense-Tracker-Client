@@ -303,70 +303,304 @@ class _ProfileScreenState extends State<ProfileScreen> {
     print('🟢 DEBUG: _showBudgetDialog called!');
     print('🟢 DEBUG: Context is valid: ${context.mounted}');
     
-    final TextEditingController budgetController = TextEditingController();
-    
-    try {
-      showDialog(
+    if (context.mounted) {
+      showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
         builder: (BuildContext context) {
-          print('🟢 DEBUG: Budget dialog builder called');
-        return AlertDialog(
-          title: const Text('Set Monthly Budget'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          print('🟢 DEBUG: Budget modal bottom sheet builder called');
+          return _buildBudgetBottomSheet(context);
+        },
+      );
+      print('🟢 DEBUG: showModalBottomSheet completed successfully');
+    }
+  }
+
+  Widget _buildBudgetBottomSheet(BuildContext context) {
+    print('🟢 DEBUG: Building budget bottom sheet widget');
+    
+    return Consumer2<AuthProvider, CurrencyProvider>(
+      builder: (context, authProvider, currencyProvider, child) {
+        final currentBudget = authProvider.user?.profile?.monthlyBudget?.toString() ?? '';
+        final currencySymbol = authProvider.getCurrencySymbol(currencyProvider);
+        final TextEditingController budgetController = TextEditingController(text: currentBudget);
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
             children: [
-              Text(
-                'Enter your monthly spending budget',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: budgetController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Monthly Budget',
-                  hintText: '0',
-                  prefixText: '\$ ',
-                  border: OutlineInputBorder(),
+              
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Set Monthly Budget',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Track your spending with a monthly limit',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        print('🟢 DEBUG: Close button pressed');
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Budget form
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Current budget info
+                      if (currentBudget.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, 
+                                   color: AppTheme.primaryColor, 
+                                   size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Current budget: $currencySymbol$currentBudget',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      
+                      // Budget input field
+                      Text(
+                        'Monthly Budget Amount',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: TextField(
+                          controller: budgetController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            prefixIcon: Container(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                currencySymbol,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                            ),
+                            hintText: '0.00',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 18,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // Helper text
+                      Text(
+                        'Set a realistic budget to help you track and control your monthly expenses',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      
+                      const Spacer(),
+                      
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                print('🟢 DEBUG: Budget save button pressed');
+                                final budgetText = budgetController.text.trim();
+                                
+                                if (budgetText.isEmpty) {
+                                  // Clear budget
+                                  try {
+                                    await authProvider.updateMonthlyBudget(null);
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Monthly budget cleared'),
+                                          backgroundColor: AppTheme.primaryColor,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    print('🔴 ERROR: Failed to clear budget: $e');
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Failed to clear budget'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                  return;
+                                }
+                                
+                                final budget = double.tryParse(budgetText);
+                                if (budget == null || budget <= 0) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please enter a valid budget amount'),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
+                                try {
+                                  await authProvider.updateMonthlyBudget(budget);
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Budget set to $currencySymbol${budget.toStringAsFixed(2)}'),
+                                        backgroundColor: AppTheme.primaryColor,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  print('🔴 ERROR: Failed to update budget: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Failed to update budget'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryColor,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Save Budget',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-                           ElevatedButton(
-                 onPressed: () {
-                   print('🟢 DEBUG: Budget save button pressed');
-                   // TODO: Update user budget preference
-                   final budget = budgetController.text;
-                   print('🟢 DEBUG: Budget value: $budget');
-                   ScaffoldMessenger.of(context).showSnackBar(
-                     SnackBar(
-                       content: Text('Budget set to \$$budget'),
-                       backgroundColor: AppTheme.primaryColor,
-                     ),
-                   );
-                   Navigator.pop(context);
-                 },
-                 style: ElevatedButton.styleFrom(
-                   backgroundColor: AppTheme.primaryColor,
-                 ),
-                 child: const Text('Save'),
-               ),
-             ],
-           );
-         },
-       );
-       print('🟢 DEBUG: showDialog completed successfully');
-     } catch (e) {
-       print('🔴 ERROR: Failed to show budget dialog: $e');
-     }
-   }
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

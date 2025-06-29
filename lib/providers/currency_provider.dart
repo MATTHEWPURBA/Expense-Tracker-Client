@@ -131,11 +131,16 @@ class CurrencyProvider extends ChangeNotifier {
   }
 
   void _safeNotifyListeners() {
-    try {
-      notifyListeners();
-    } catch (e) {
-      print('💱 WARNING: Error notifying listeners: $e');
-    }
+    // Use Future.microtask to avoid setState during build
+    Future.microtask(() {
+      try {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      } catch (e) {
+        print('💱 WARNING: Error notifying listeners: $e');
+      }
+    });
   }
 
   // Initialize with fallback currencies immediately

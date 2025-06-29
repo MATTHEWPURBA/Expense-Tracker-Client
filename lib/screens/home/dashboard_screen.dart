@@ -23,6 +23,13 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
+  // Method to change tab from child widgets
+  void changeTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,11 +73,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          _DashboardTab(),
-          _TransactionsTab(),
-          _CategoriesTab(),
-          ProfileScreen(),
+        children: [
+          _DashboardTab(onChangeTab: changeTab),
+          const _TransactionsTab(),
+          const _CategoriesTab(),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -165,7 +172,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _DashboardTab extends StatelessWidget {
-  const _DashboardTab();
+  final Function(int) onChangeTab;
+  
+  const _DashboardTab({required this.onChangeTab});
 
   @override
   Widget build(BuildContext context) {
@@ -476,7 +485,10 @@ class _DashboardTab extends StatelessWidget {
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: () {}, // Will navigate to transactions tab
+                            onPressed: () {
+                              // Navigate to transactions tab
+                              onChangeTab(1);
+                            },
                             icon: const Icon(Icons.arrow_forward, size: 16),
                             label: const Text('See All'),
                             style: TextButton.styleFrom(
@@ -855,7 +867,12 @@ class _TransactionsTabState extends State<_TransactionsTab> {
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    // Use Future.microtask to avoid setState during build
+    Future.microtask(() {
+      if (mounted) {
+        _loadTransactions();
+      }
+    });
   }
 
   @override
@@ -1285,7 +1302,12 @@ class _CategoriesTabState extends State<_CategoriesTab> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    // Use Future.microtask to avoid setState during build
+    Future.microtask(() {
+      if (mounted) {
+        _loadCategories();
+      }
+    });
   }
 
   Future<void> _loadCategories() async {
@@ -1297,6 +1319,15 @@ class _CategoriesTabState extends State<_CategoriesTab> {
       }
     } catch (e) {
       print('Error loading categories: $e');
+      // If loading fails, try to load default categories
+      if (mounted) {
+        try {
+          final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+          await categoryProvider.loadDefaultCategories();
+        } catch (defaultError) {
+          print('Error loading default categories: $defaultError');
+        }
+      }
     }
   }
 
@@ -1413,9 +1444,24 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadCategories,
-                            child: const Text('Retry'),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                onPressed: _loadCategories,
+                                child: const Text('Retry'),
+                              ),
+                              const SizedBox(width: 12),
+                              OutlinedButton(
+                                onPressed: () async {
+                                  if (mounted) {
+                                    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+                                    await categoryProvider.loadDefaultCategories();
+                                  }
+                                },
+                                child: const Text('Use Offline'),
+                              ),
+                            ],
                           ),
                         ],
                       ),

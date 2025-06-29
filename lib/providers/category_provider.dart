@@ -52,13 +52,42 @@ class CategoryProvider extends ChangeNotifier {
       
       _safeNotifyListeners();
     } on HttpException catch (e) {
-      _setError(e.message);
-      // If API fails, load default categories for offline use
-      _loadDefaultCategories();
+      // Handle authentication errors specifically
+      if (e.message.contains('401') || e.message.contains('Unauthorized')) {
+        // User is not authenticated, load default categories without showing error
+        _loadDefaultCategories();
+        if (_categories.isNotEmpty) {
+          _clearError();
+        } else {
+          _setError('Please log in to sync your categories');
+        }
+      } else {
+        // Other HTTP errors - try to load default categories as fallback
+        try {
+          _loadDefaultCategories();
+          // If default categories loaded successfully, clear the error
+          if (_categories.isNotEmpty) {
+            _clearError();
+          } else {
+            _setError('Unable to load categories: ${e.message}');
+          }
+        } catch (fallbackError) {
+          _setError('Unable to load categories: ${e.message}');
+        }
+      }
     } catch (e) {
-      _setError('Failed to load categories');
-      // If API fails, load default categories for offline use
-      _loadDefaultCategories();
+      // Try to load default categories as fallback
+      try {
+        _loadDefaultCategories();
+        // If default categories loaded successfully, clear the error
+        if (_categories.isNotEmpty) {
+          _clearError();
+        } else {
+          _setError('Failed to load categories. Please check your connection.');
+        }
+      } catch (fallbackError) {
+        _setError('Failed to load categories. Please check your connection.');
+      }
     } finally {
       _setLoading(false);
     }
@@ -181,6 +210,20 @@ class CategoryProvider extends ChangeNotifier {
     _safeNotifyListeners();
   }
 
+  // Force load default categories (useful when API is not available)
+  Future<void> loadDefaultCategories() async {
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      _loadDefaultCategories();
+    } catch (e) {
+      _setError('Failed to load default categories');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   // Get category names for dropdown
   List<String> getCategoryNames(String type) {
     return getCategoriesByType(type).map((c) => c.name).toList();
@@ -230,12 +273,16 @@ class CategoryProvider extends ChangeNotifier {
     // Immediately return if disposed - don't even schedule the notification
     if (_disposed || !hasListeners) return;
     
-    // Call notifyListeners directly but catch any disposal errors
-    try {
-      notifyListeners();
-    } catch (e) {
-      // Provider was disposed during the call - ignore silently
-    }
+    // Use Future.microtask to avoid setState during build
+    Future.microtask(() {
+      if (!_disposed && hasListeners) {
+        try {
+          notifyListeners();
+        } catch (e) {
+          // Provider was disposed during the call - ignore silently
+        }
+      }
+    });
   }
 
   // Clear all data (useful for logout)
@@ -243,5 +290,26 @@ class CategoryProvider extends ChangeNotifier {
     if (_disposed) return;
     _categories.clear();
     _clearError();
+  }
+
+  // Check if user is authenticated and load categories accordingly
+  Future<void> loadCategoriesWithAuthCheck() async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Try to get a simple authenticated endpoint first
+      await _apiService.get('/auth/profile/', includeAuth: true);
+      // If successful, user is authenticated, load categories normally
+      await loadCategories();
+    } catch (e) {
+      // User is not authenticated, load default categories
+      _loadDefaultCategories();
+      if (_categories.isEmpty) {
+        _setError('Please log in to access your categories');
+      }
+    } finally {
+      _setLoading(false);
+    }
   }
 } 

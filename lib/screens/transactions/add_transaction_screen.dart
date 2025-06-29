@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../models/transaction_model.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/category_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/currency_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/theme.dart';
 import '../../widgets/custom_text_field.dart';
@@ -184,11 +186,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Amount: \$${transactionAmount.toStringAsFixed(2)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Consumer2<AuthProvider, CurrencyProvider>(
+                    builder: (context, authProvider, currencyProvider, child) {
+                      return Text(
+                        'Amount: ${authProvider.getCurrencySymbol(currencyProvider)}${transactionAmount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -208,7 +214,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         // Show success notification as well
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Transaction "$transactionTitle" added successfully!'),
+            content: Text('✅ Transaction "$transactionTitle" (${context.read<AuthProvider>().getCurrencySymbol(context.read<CurrencyProvider>())}${transactionAmount.toStringAsFixed(2)}) added successfully!'),
             backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 3),
             action: SnackBarAction(
@@ -502,10 +508,10 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                               ? AppTheme.successColor 
                               : AppTheme.errorColor,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: '0.00',
-                          border: OutlineInputBorder(),
-                          prefixText: '\$ ',
+                          border: const OutlineInputBorder(),
+                          prefixText: '${context.watch<AuthProvider>().getCurrencySymbol(context.watch<CurrencyProvider>())} ',
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
